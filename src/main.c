@@ -80,12 +80,12 @@ volatile avr32_adc_t *adc = &AVR32_ADC;
 
 uint16_t adc_read(uint8_t chanum)
 {
-	return *(&(AVR32_ADC.cdr0) + chanum);
+	return *(&(AVR32_ADC.cdr0) + (chanum * 4));
 }
 
-double adc_conv2volts(uint16_t bitconv, double vref)
+double adc_conv2volts(uint16_t conv, double vref)
 {
-	return vref * (bitconv / 1023);
+	return (vref / 1024) * conv;
 }
 
 
@@ -101,6 +101,7 @@ main(void)
 	init_board();
 	aery_gpio_init_pin(LED, GPIO_OUTPUT);
 	aery_gpio_init_pins(porta, SPI0_GPIO_MASK, GPIO_FUNCTION_A);
+	aery_gpio_init_pins(porta, 0xff << 21, GPIO_FUNCTION_A);
 
 	// Init RTC for delays
 	aery_gpio_enable_localbus();
@@ -129,7 +130,8 @@ main(void)
 	adc->MR.sleep = 0; // no sleep, use normal mode
 	adc->MR.lowres = 0; // 10-bit resolution, 1 would have been 8-bit
 	adc->MR.trgen = 0; // use software start for conversion
-	adc->cher = 0xf; // enable all channels
+
+	adc->cher = 0xff; // enable all channels
 
 	// Init OK
 	aery_gpio_set_pin_high(LED);
@@ -141,7 +143,7 @@ main(void)
 		adc->CR.start = true;
 
 		// Wait conversion to complete for all channels
-		while ((adc->sr & 0xf) != 0xf);
+		while ((adc->sr & 0xff) != 0xff);
 
 		// Collect conversion data
 		for (i = 0; i < 8; i++) {
@@ -160,7 +162,7 @@ main(void)
 			adc_conv2volts(c[3], ADC_VREF)
 		);
 
-		aery_rtc_delay_cycle(57500*2);
+		aery_rtc_delay_cycle(57500);
 
 		display_instruct(HD44780_DDRAM_ADDR);
 		display_printf("5. %.2f 6. %.2f",
@@ -173,7 +175,7 @@ main(void)
 			adc_conv2volts(c[7], ADC_VREF)
 		);
 
-		aery_rtc_delay_cycle(57500*2);
+		aery_rtc_delay_cycle(57500);
 	}
 
 	return 0;
